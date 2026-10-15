@@ -126,3 +126,6 @@ export class App {
 }
 
 export const debounce = (fn: (...args: unknown[]) => unknown) => fn;
+
+export const setIcon = () => {};
+export class Notice { hide() {} }

@@ -5,6 +5,8 @@ export type PatternRule = { pattern: string; mode: string };
 export type TagRule = { tag: string; mode: string };
 
 export interface CurrentViewSettings {
+  crmNativeLockMenu: boolean;
+  crmNotebookNavigatorIntegration: boolean;
   debounceTimeout: number;
   customFrontmatterKey: string;
   ignoreAlreadyOpen: boolean;
@@ -22,6 +24,8 @@ export interface CurrentViewSettings {
 }
 
 export const DEFAULT_SETTINGS: CurrentViewSettings = {
+  crmNativeLockMenu: false,
+  crmNotebookNavigatorIntegration: false,
   debounceTimeout: 300,
   customFrontmatterKey: "current view",
   ignoreAlreadyOpen: false,

@@ -36,6 +36,8 @@ export default class CurrentViewSettingsPlugin extends Plugin {
   openedFiles: string[];
   private activeNotice: Notice | undefined;
   private recentlyCreated = new Set<string>();
+  private crmReady = false;
+  private crmNativeMenuRefs: EventRef[] = [];
 
   async onload() {
     await this.loadSettings();
@@ -257,7 +259,7 @@ export default class CurrentViewSettingsPlugin extends Plugin {
                 : "Source";
             const frag = activeDocument.createDocumentFragment();
             frag.createEl("span", {
-              text: `Current View: view mode changed to ${modeLabel}. `,
+              text: `${this.manifest.name}: view mode changed to ${modeLabel}. `,
             });
             const btn = frag.createEl("button", { text: "Apply now" });
             this.activeNotice = new Notice(frag, 8000);
@@ -271,19 +273,6 @@ export default class CurrentViewSettingsPlugin extends Plugin {
           }
         }, 500)
       )
-    );
-
-    this.registerEvent(
-      this.app.workspace.on("file-menu" as any, (menu: Menu, file: TFile | TFolder) => {
-        const target: LockTarget = file instanceof TFolder ? "folder" : "file";
-        addLockMenuItems(menu, file.path, target, this);
-      })
-    );
-
-    this.registerEvent(
-      this.app.workspace.on("folder-menu" as any, (menu: Menu, folder: TFolder) => {
-        addLockMenuItems(menu, folder.path, "folder", this);
-      })
     );
 
     const refreshDecorations = () => {
@@ -318,8 +307,8 @@ export default class CurrentViewSettingsPlugin extends Plugin {
 
     refreshDecorations();
 
-    // Initialize Notebook Navigator integration (if installed)
-    initNotebookNavigatorIntegration(this);
+    this.crmReady = true;
+    this.applyCrmSettings();
   }
 
   async loadSettings() {
@@ -328,9 +317,34 @@ export default class CurrentViewSettingsPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    if (this.crmReady) this.applyCrmSettings();
+  }
+
+  /** Apply CRM switches without reloading the plugin or duplicating listeners. */
+  applyCrmSettings() {
+    if (this.settings.crmNativeLockMenu && this.crmNativeMenuRefs.length === 0) {
+      this.crmNativeMenuRefs = [
+        this.app.workspace.on("file-menu" as any, (menu: Menu, file: TFile | TFolder) => {
+          const target: LockTarget = file instanceof TFolder ? "folder" : "file";
+          addLockMenuItems(menu, file.path, target, this);
+        }),
+        this.app.workspace.on("folder-menu" as any, (menu: Menu, folder: TFolder) => {
+          addLockMenuItems(menu, folder.path, "folder", this);
+        }),
+      ];
+    } else if (!this.settings.crmNativeLockMenu) {
+      this.clearCrmNativeMenus();
+    }
+    initNotebookNavigatorIntegration(this);
+  }
+
+  private clearCrmNativeMenus() {
+    for (const ref of this.crmNativeMenuRefs.splice(0)) this.app.workspace.offref(ref);
   }
 
   onunload() {
+    this.crmReady = false;
+    this.clearCrmNativeMenus();
     clearDecorations();
     destroyNotebookNavigatorIntegration();
     resetViewsToDefault(this);

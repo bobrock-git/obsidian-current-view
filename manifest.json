@@ -1,6 +1,6 @@
 {
 	"id": "current-view",
-	"name": "Current View",
+	"name": "Current View (CRM Mod)",
 	"version": "1.6.4",
 	"minAppVersion": "1.6.6",
 	"description": "Automatically set the view mode (Reading, Live Preview, Source) for notes using folder rules, file patterns, or frontmatter.",

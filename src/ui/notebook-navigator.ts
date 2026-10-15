@@ -23,6 +23,8 @@ let fileListObserver: MutationObserver | null = null;
 let fileMenuDispose: MenuExtensionDispose | null = null;
 let folderMenuDispose: MenuExtensionDispose | null = null;
 let decorateDebounceTimer: number | null = null;
+let menuRetryTimer: number | null = null;
+let activePlugin: CurrentViewSettingsPlugin | null = null;
 
 /**
  * Get the Notebook Navigator API if available
@@ -37,29 +39,37 @@ const getNotebookNavigatorAPI = (plugin: CurrentViewSettingsPlugin): NotebookNav
  * Initialize Notebook Navigator integration
  */
 export const initNotebookNavigatorIntegration = (plugin: CurrentViewSettingsPlugin) => {
-  // Try to register immediately
-  tryRegisterMenus(plugin);
-  
-  // Also try again after a delay, in case Notebook Navigator loads after us
-  window.setTimeout(() => {
-    if (!fileMenuDispose && !folderMenuDispose) {
-      tryRegisterMenus(plugin);
-    }
-  }, 1000);
-
-  // Watch for file list changes to add icons
-  setupFileListObserver(plugin);
+  if (!plugin.settings.crmNotebookNavigatorIntegration) {
+    if (activePlugin) destroyNotebookNavigatorIntegration();
+    return;
+  }
+  if (activePlugin !== plugin) {
+    destroyNotebookNavigatorIntegration();
+    activePlugin = plugin;
+    tryRegisterMenus(plugin);
+    menuRetryTimer = window.setTimeout(() => {
+      menuRetryTimer = null;
+      if (activePlugin === plugin && (!fileMenuDispose || !folderMenuDispose)) tryRegisterMenus(plugin);
+    }, 1000);
+  }
+  if (plugin.settings.showExplorerIcons) {
+    if (!fileListObserver) setupFileListObserver(plugin);
+  } else {
+    stopFileListObserver();
+    clearNotebookNavigatorDecorations();
+  }
 };
 
 /**
  * Try to register menu items with Notebook Navigator
  */
 const tryRegisterMenus = (plugin: CurrentViewSettingsPlugin) => {
+  if (activePlugin !== plugin || !plugin.settings.crmNotebookNavigatorIntegration) return;
   const api = getNotebookNavigatorAPI(plugin);
   
   if (api?.menus) {
     // Register menu items using the official API
-    fileMenuDispose = api.menus.registerFileMenu((ctx) => {
+    fileMenuDispose ??= api.menus.registerFileMenu((ctx) => {
       if (ctx.selection.mode !== 'single') {
         return; // Only show menu for single file selection
       }
@@ -67,7 +77,7 @@ const tryRegisterMenus = (plugin: CurrentViewSettingsPlugin) => {
       addLockMenuItemsToNotebookNavigator((cb) => ctx.addItem(cb), ctx.file.path, "file", plugin);
     });
 
-    folderMenuDispose = api.menus.registerFolderMenu((ctx) => {
+    folderMenuDispose ??= api.menus.registerFolderMenu((ctx) => {
       addLockMenuItemsToNotebookNavigator((cb) => ctx.addItem(cb), ctx.folder.path, "folder", plugin);
     });
   }
@@ -77,21 +87,24 @@ const tryRegisterMenus = (plugin: CurrentViewSettingsPlugin) => {
  * Cleanup observers and listeners
  */
 export const destroyNotebookNavigatorIntegration = () => {
+  activePlugin = null;
+  if (menuRetryTimer !== null) window.clearTimeout(menuRetryTimer);
+  menuRetryTimer = null;
   // Dispose menu registrations
   fileMenuDispose?.();
   fileMenuDispose = null;
   folderMenuDispose?.();
   folderMenuDispose = null;
 
-  // Cleanup file list observer and pending debounce
-  if (decorateDebounceTimer) {
-    window.clearTimeout(decorateDebounceTimer);
-    decorateDebounceTimer = null;
-  }
+  stopFileListObserver();
+  clearNotebookNavigatorDecorations();
+};
+
+const stopFileListObserver = () => {
+  if (decorateDebounceTimer !== null) window.clearTimeout(decorateDebounceTimer);
+  decorateDebounceTimer = null;
   fileListObserver?.disconnect();
   fileListObserver = null;
-  
-  clearNotebookNavigatorDecorations();
 };
 
 /**
@@ -187,6 +200,7 @@ const setupFileListObserver = (plugin: CurrentViewSettingsPlugin) => {
  * Add lock icons to Notebook Navigator file and folder items
  */
 export const decorateNotebookNavigator = (plugin: CurrentViewSettingsPlugin) => {
+  if (!plugin.settings.crmNotebookNavigatorIntegration) return;
   if (!plugin.settings.showExplorerIcons) {
     clearNotebookNavigatorDecorations();
     return;

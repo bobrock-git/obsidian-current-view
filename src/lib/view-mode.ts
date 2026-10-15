@@ -8,9 +8,13 @@ const isValidMode = (value: string | null | undefined): value is ViewMode => {
   return !!value && (VALID_MODES as string[]).includes(value);
 };
 
+const CRM_LEGACY_ALIASES: Record<string, ViewMode> = { preview: "reading", edit: "live" };
+
 export const normalizeFrontmatterMode = (value: unknown): ViewMode | null => {
   if (typeof value !== "string") return null;
-  return isValidMode(value.trim()) ? (value.trim() as ViewMode) : null;
+  const normalized = value.trim().toLowerCase();
+  const mode = CRM_LEGACY_ALIASES[normalized] ?? normalized;
+  return isValidMode(mode) ? mode : null;
 };
 
 export const parseRuleMode = (
@@ -18,10 +22,11 @@ export const parseRuleMode = (
   customFrontmatterKey: string
 ): ViewMode | null => {
   if (!rawMode) return null;
-  const [key, value] = rawMode.split(":").map((s) => s.trim());
+  const parts = rawMode.split(":").map((part) => part.trim());
+  const key = parts[0];
   if (key === "default") return null;
-  if (key !== customFrontmatterKey) return null;
-  return isValidMode(value) ? value : null;
+  if (parts.length > 1 && key !== customFrontmatterKey && key !== "auto-view-mode") return null;
+  return normalizeFrontmatterMode(parts.length > 1 ? parts[1] : parts[0]);
 };
 
 export const resolveViewModeDecision = ({

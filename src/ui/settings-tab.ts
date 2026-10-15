@@ -22,6 +22,26 @@ export class CurrentViewSettingsTab extends PluginSettingTab {
       cls: "setting-item-description"
     });
 
+    new Setting(containerEl).setName("CRM").setHeading();
+    new Setting(containerEl)
+      .setName("Menu Lock/Unlock w Obsidianie")
+      .setDesc("Dodaje wybór trybu widoku do menu plików i folderów. Domyślnie wyłączone.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.crmNativeLockMenu)
+        .onChange(async (value) => {
+          this.plugin.settings.crmNativeLockMenu = value;
+          await this.plugin.saveSettings();
+        }));
+    new Setting(containerEl)
+      .setName("Integracja z Notebook Navigatorem")
+      .setDesc("Dodaje menu Lock/Unlock. Ikony wymagają także włączenia Show lock icons. Domyślnie wyłączone.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.crmNotebookNavigatorIntegration)
+        .onChange(async (value) => {
+          this.plugin.settings.crmNotebookNavigatorIntegration = value;
+          await this.plugin.saveSettings();
+        }));
+
     new Setting(containerEl)
       .setName("Frontmatter key")
       .setDesc("Custom frontmatter field to define view mode per note.")
